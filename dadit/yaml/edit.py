@@ -144,8 +144,6 @@ def get_node_by_name(node: Node, name: str) -> Node:
         case "block_sequence":
             return [*query(node, children, type("block_sequence_item"))][int(name)]
         case "flow_node":
-            print("get_node_by_name", node.type)
-            print(node.sexp())
             return get_node_by_name(
                 single(
                     query(
@@ -329,7 +327,6 @@ def edit_add(root: Node, path: list[str], value: JSON) -> Iterable[Edit]:
 
 def edit_remove(root: Node, path: list[str]) -> Iterable[Edit]:
     node = get_node_by_path(root, path)
-    print(node.sexp())
     match node.type:
         case "block_mapping_pair":
             if query(
@@ -471,7 +468,6 @@ def apply_patch(content: str, patch_operations: Iterable[JSONPatchOperation]) ->
 
 
 def stringify_block(value: JSON) -> str:
-    print("stringify_block")
     match value:
         case list() as value:
             return "\n".join(stringify_block_sequence_item(item) for item in value)
@@ -492,7 +488,6 @@ def indent_block(value: str, indentation: str = default_indentation) -> str:
 
 
 def stringify_block_sequence_item(value: JSON) -> str:
-    print("stringify_block_sequence_item")
     match value:
         case list() as value:
             return f"- {indent_block(stringify_block(value))}"
@@ -513,7 +508,6 @@ def stringify_block_sequence_item(value: JSON) -> str:
 
 
 def stringify_block_mapping_pair(key: str, value: JSON) -> str:
-    print("stringify_block_mapping_pair")
     match value:
         case list() as value:
             return f"{key}:\n{stringify_block(value)}"
