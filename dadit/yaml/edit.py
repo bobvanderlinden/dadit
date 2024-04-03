@@ -2,13 +2,34 @@ from tree_sitter import Node
 from typing import Iterable
 import re
 from ..json import JSON, dumps as json_dumps
-from ..tree_sitter.selector import Selector, query, chain, children, conditional, type, field, single, union, parent, filter
+from ..tree_sitter.selector import (
+    Selector,
+    query,
+    chain,
+    children,
+    conditional,
+    type,
+    field,
+    single,
+    union,
+    parent,
+    filter,
+)
 from ..tree_sitter.document import Document
 from ..tree_sitter.edit import Edit, Replace, Insert, Remove, apply_edits
-from ..json_patch import JSONPatchOperation, JSONPatchAdd, JSONPatchRemove, JSONPatchReplace, JSONPatchMove, JSONPatchCopy, JSONPatchTest
+from ..json_patch import (
+    JSONPatchOperation,
+    JSONPatchAdd,
+    JSONPatchRemove,
+    JSONPatchReplace,
+    JSONPatchMove,
+    JSONPatchCopy,
+    JSONPatchTest,
+)
 from .serialization import loads as yaml_loads
 
 default_indentation = "  "
+
 
 def key_field(str) -> Selector:
     return filter(
@@ -31,6 +52,7 @@ def parse_string(node: Node) -> str:
             return text.decode("utf-8")
         case _:
             raise ValueError(f"Unsupported node type {node.type}")
+
 
 def get_indentation(node: Node) -> str:
     start_byte = node.start_byte
