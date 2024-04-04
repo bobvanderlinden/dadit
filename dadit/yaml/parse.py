@@ -1,6 +1,7 @@
 from ..tree_sitter.selector import (
     query,
     children,
+    named_children,
     type,
     field,
     single,
@@ -14,8 +15,8 @@ def parse_node(node: Node) -> JSON:
     match node.type:
         case "block_mapping":
             return {
-                single(query(pair, field("key"))).text: parse_node(
-                    single(query(pair, field("value")))
+                parse_node(pair.child_by_field_name("key")): parse_node(
+                    pair.child_by_field_name("value")
                 )
                 for pair in query(node, children, type("block_mapping_pair"))
             }
@@ -33,7 +34,7 @@ def parse_node(node: Node) -> JSON:
             }
         case "flow_sequence":
             return [
-                parse_node(item) for item in query(node, children, type("flow_item"))
+                parse_node(item) for item in query(node, children, type("flow_node"))
             ]
         case (
             "document"
@@ -42,12 +43,17 @@ def parse_node(node: Node) -> JSON:
             | "flow_node"
             | "flow_scalar"
             | "plain_scalar"
+            | "block_sequence_item"
         ):
-            return single(query(node, children))
+            return parse_node(single(query(node, named_children)))
+        case "null_scalar":
+            return None
+        case "boolean_scalar":
+            return parse_boolean(node.text.decode("utf-8"))
         case "integer_scalar":
-            return int(node.text)
+            return int(node.text.decode("utf-8"))
         case "float_scalar":
-            return float(node.text)
+            return float(node.text.decode("utf-8"))
         case "string_scalar":
             return node.text.decode("utf-8")
         case "double_quote_scalar":
@@ -55,25 +61,7 @@ def parse_node(node: Node) -> JSON:
         case "single_quote_scalar":
             return unescape_single_quoted(node.text.decode("utf-8")[1:-1])
         case "block_scalar":
-            text = node.text.decode("utf-8")
-            match = re.search(r"^([\\|>]-?)[^\\n]*\n")
-            if not match:
-                raise ValueError(f"Invalid block scalar {text}")
-            style = match.group(1)
-            text = text.removeprefix(match.group(0))
-            indentation = re.search(r"^[ \t]*", text).group(0)
-            lines = [line.removeprefix(indentation) for line in text.splitlines()]
-            match style:
-                case "|":
-                    return "\n".join(lines) + "\n"
-                case ">":
-                    return " ".join(lines) + "\n"
-                case "|-":
-                    return "\n".join(lines)
-                case ">-":
-                    return " ".join(lines)
-                case _:
-                    raise ValueError(f"Invalid block scalar style {style}")
+            return parse_scalar_block(node.text.decode("utf-8"))
         case unknown_type:
             raise ValueError(f"Unsupported node type {unknown_type}")
 
@@ -114,3 +102,34 @@ def unescape_double_quoted_escape_sequence_match(match: re.Match[str]) -> str:
             return chr(int(match.group(1)[1:], 16))
         case _:
             return match.group(1)
+
+
+def parse_boolean(value: str) -> bool:
+    match value:
+        case "true" | "True" | "TRUE":
+            return True
+        case "false" | "False" | "FALSE":
+            return False
+        case _:
+            raise ValueError(f"Invalid boolean value {value}")
+
+
+def parse_scalar_block(block: str) -> str:
+    match = re.search(r"^([\\|>]-?)[^\n]*\n([ \t]*)", block)
+    if not match:
+        raise ValueError(f"Invalid block scalar {block}")
+    style = match.group(1)
+    indentation = match.group(2)
+    block = block[len(match.group(0)) - len(match.group(2)) :]
+    lines = [line.removeprefix(indentation) for line in block.splitlines()]
+    match style:
+        case "|":
+            return "\n".join(lines) + "\n"
+        case ">":
+            return " ".join(lines) + "\n"
+        case "|-":
+            return "\n".join(lines)
+        case ">-":
+            return " ".join(lines)
+        case _:
+            raise ValueError(f"Invalid block scalar style {style}")

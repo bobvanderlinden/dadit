@@ -3,6 +3,7 @@ from typing import Iterable, Any, Callable
 
 type Selector = Callable[[Node], Iterable[Node]]
 
+
 def query(node, *selectors: Selector) -> Iterable[Node]:
     return chain(*selectors)(node)
 
@@ -19,6 +20,11 @@ def chain(*selectors: Selector) -> Selector:
 
 def children(node: Node) -> Iterable[Node]:
     for child in node.children:
+        yield child
+
+
+def named_children(node: Node) -> Iterable[Node]:
+    for child in node.named_children:
         yield child
 
 
