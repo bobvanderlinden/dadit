@@ -337,4 +337,4 @@ tree-sitter = "*"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "d95e0bb442d9419dd93c510d599eecb1ae2029cea0a58f9dac245e1b2af292d0"
+content-hash = "3612f560819333275b2b1328f999b30a34c56701dcb4103f7a8d3c38983931d8"

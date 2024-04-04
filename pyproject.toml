@@ -8,13 +8,13 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.11"
 tree-sitter-languages = "^1.10.2"
-ruamel-yaml = "^0.18.6"
 jsonpatch = "^1.33"
 
 
 [tool.poetry.group.dev.dependencies]
 pyright = "^1.1.356"
 pytest = "^8.1.1"
+ruamel-yaml = "^0.18.6"
 
 [tool.poetry.scripts]
 dadit = "dadit:main"
