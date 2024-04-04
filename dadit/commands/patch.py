@@ -1,6 +1,6 @@
 import sys
 import argparse
-from typing import Any, IO, Callable, List
+from typing import Any, IO, Callable, List, Sequence
 import json
 from ..json import JSON, loads as json_loads
 from ..yaml.edit import apply_patch as apply_yaml_patch
@@ -25,7 +25,7 @@ def parse_json_patch(path: str) -> list[JSONPatchOperation]:
         return [JSONPatchOperation.from_json(op) for op in json.load(file)]
 
 
-def parse_json_pointer(pointer: str) -> str:
+def parse_json_pointer(pointer: str) -> JSONPointer:
     return JSONPointer.parse(pointer)
 
 
@@ -48,21 +48,12 @@ def patch(
     source: IO[Any],
     destination: IO[Any],
     patch_operations: JSONPatch,
-    **kwargs
+    **kwargs,
 ):
     apply_patch = patchers[format]
     source_content = source.read()
     destination_content = apply_patch(source_content, patch_operations)
     destination.write(destination_content)
-
-
-class AddAction(argparse.Action):
-    def __call__(self, parser, namespace, values, option_string=None):
-        pointer, value = values
-        namespace.patch_operations = [
-            *namespace.patch_operations,
-            JSONPatchAdd(pointer, value),
-        ]
 
 
 def create_patch_action(arg_parser: Callable[[str], List[JSONPatchOperation]]):
@@ -71,6 +62,8 @@ def create_patch_action(arg_parser: Callable[[str], List[JSONPatchOperation]]):
             super().__init__(*args, **kwargs)
 
         def __call__(self, parser, namespace, values, option_string=None):
+            if not isinstance(values, str):
+                raise ValueError(f"Unsupported argument type {type(values)}")
             setattr(
                 namespace,
                 "patch_operations",
@@ -90,7 +83,7 @@ def subparser(subparsers):
 
     parser.add_argument("--patch-file", action=create_patch_action(parse_json_patch))
 
-    def parse_replace_args(values):
+    def parse_replace_args(values) -> List[JSONPatchOperation]:
         pointer, value = tuple_parser([parse_json_pointer, parse_value])(values)
         return [JSONPatchReplace(pointer, value)]
 
@@ -100,7 +93,7 @@ def subparser(subparsers):
         action=create_patch_action(parse_replace_args),
     )
 
-    def parse_add_args(values):
+    def parse_add_args(values) -> List[JSONPatchOperation]:
         pointer, value = tuple_parser([parse_json_pointer, parse_value])(values)
         return [JSONPatchAdd(pointer, value)]
 
@@ -110,8 +103,9 @@ def subparser(subparsers):
         action=create_patch_action(parse_add_args),
     )
 
-    def parse_remove_args(values):
-        (pointer) = tuple_parser([parse_json_pointer(values)])
+    def parse_remove_args(values) -> List[JSONPatchOperation]:
+        assert len(values) == 1
+        pointer = parse_json_pointer(values[0])
         return [JSONPatchRemove(pointer)]
 
     parser.add_argument(
@@ -120,7 +114,7 @@ def subparser(subparsers):
         action=create_patch_action(parse_remove_args),
     )
 
-    def parse_move_args(values):
+    def parse_move_args(values) -> List[JSONPatchOperation]:
         from_, pointer = tuple_parser([parse_json_pointer, parse_json_pointer])(values)
         return [JSONPatchMove(from_, pointer)]
 
@@ -130,7 +124,7 @@ def subparser(subparsers):
         action=create_patch_action(parse_move_args),
     )
 
-    def parse_copy_args(values):
+    def parse_copy_args(values) -> List[JSONPatchOperation]:
         from_, pointer = tuple_parser([parse_json_pointer, parse_json_pointer])(values)
         return [JSONPatchCopy(from_, pointer)]
 

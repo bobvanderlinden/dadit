@@ -192,8 +192,8 @@ def get_node_by_name(node: Node, name: str) -> Node:
 
 
 def get_node_by_path(node: Node, path: list[str]) -> Node:
-    if node.type == "stream":
-        node = node.named_child(0)
+    if node.type == "stream" and (child := node.named_child(0)):
+        node = child
     match path:
         case []:
             return node
@@ -239,7 +239,9 @@ def edit_replace(root: Node, path: list[str], value: JSON) -> Iterable[Edit]:
     match node.type:
         case "block_mapping_pair":
             selection = select_node(node)
-            key = node.child_by_field_name("key").text.decode("utf-8")
+            key_node = node.child_by_field_name("key")
+            assert key_node
+            key = key_node.text.decode("utf-8")
             yaml_pair = indent_block(
                 stringify_block_mapping_pair(key, value),
                 indentation=get_block_indentation(node),
@@ -376,9 +378,8 @@ def edit_remove(root: Node, path: list[str]) -> Iterable[Edit]:
     node = get_node_by_path(root, path)
     match node.type:
         case "block_mapping_pair":
-            if query(
-                node,
-                parent,
+            if node.parent and query(
+                node.parent,
                 type("block_mapping"),
                 children,
                 type("block_mapping_pair"),
@@ -399,8 +400,7 @@ def edit_remove(root: Node, path: list[str]) -> Iterable[Edit]:
                 # If the block_mapping resides inside an item/pair (ends with `-` or `:`), add a space.
                 if (
                     query(
-                        node,
-                        parent,
+                        node.parent,
                         type("block_mapping"),
                         parent,
                         type("block_node"),
@@ -412,7 +412,7 @@ def edit_remove(root: Node, path: list[str]) -> Iterable[Edit]:
                     yaml_fragment = b" " + yaml_fragment
 
                 # If the previous block ended with a newline, let the new expression also end with a newline.
-                if node.parent.text.endswith(b"\n"):
+                if node.parent and node.parent.text.endswith(b"\n"):
                     yaml_fragment += b"\n"
 
                 yield Replace(*selection, yaml_fragment)

@@ -11,14 +11,20 @@ from ..json import JSON
 import re
 
 
+def parse_string_node(node: Node) -> str:
+    value = parse_node(node)
+    assert isinstance(value, str)
+    return value
+
+
 def parse_node(node: Node) -> JSON:
     match node.type:
         case "block_mapping":
             return {
-                parse_node(pair.child_by_field_name("key")): parse_node(
-                    pair.child_by_field_name("value")
-                )
+                parse_string_node(key): parse_node(value)
                 for pair in query(node, children, type("block_mapping_pair"))
+                if (key := pair.child_by_field_name("key"))
+                if (value := pair.child_by_field_name("value"))
             }
         case "block_sequence":
             return [
@@ -27,10 +33,10 @@ def parse_node(node: Node) -> JSON:
             ]
         case "flow_mapping":
             return {
-                parse_node(pair.child_by_field_name("key")): parse_node(
-                    pair.child_by_field_name("value")
-                )
+                parse_string_node(key): parse_node(value)
                 for pair in query(node, children, type("flow_pair"))
+                if (key := pair.child_by_field_name("key"))
+                if (value := pair.child_by_field_name("value"))
             }
         case "flow_sequence":
             return [

@@ -1,5 +1,5 @@
 from tree_sitter import Node, Tree, Parser
-from typing import Iterable, Any, Callable
+from typing import Iterable, Any, Callable, Optional
 
 type Selector = Callable[[Node], Iterable[Node]]
 
@@ -86,7 +86,7 @@ def single(nodes: Iterable[Node]) -> Node:
             raise ValueError("Expected a single node, got more than one")
 
 
-def optional(nodes: Iterable[Node]) -> Node:
+def optional(nodes: Iterable[Node]) -> Optional[Node]:
     match [*nodes]:
         case [node]:
             return node
