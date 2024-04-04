@@ -1,7 +1,28 @@
 from .edit import apply_patch, JSONPatchOperation
 import pytest
 import jsonpatch
-from .serialization import dumps
+from ruamel.yaml import YAML, Dumper
+from io import StringIO
+from ..json import JSON
+
+
+def str_representer(dumper: Dumper, value: str):
+    style = None
+    if "\n" in value:  # check for multiline string
+        style = "|"
+    return dumper.represent_scalar(
+        tag="tag:yaml.org,2002:str", value=value, style=style
+    )
+
+
+_yaml = YAML()
+_yaml.representer.add_representer(str, str_representer)
+
+
+def dumps(data: JSON) -> str:
+    with StringIO() as stream:
+        _yaml.dump(data, stream)
+        return stream.getvalue()
 
 
 def assert_patch(source, patch, expected):
