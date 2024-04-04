@@ -15,5 +15,5 @@ jobs:
           cache: poetry
       - name: Install dependencies
         run: poetry install
-      - run: pytest
-      - run: pyright
+      - run: poetry run pytest
+      - run: poetry run pyright
