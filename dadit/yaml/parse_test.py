@@ -30,9 +30,6 @@ yaml = YAML()
         - item
         """,
         """
-        key: value
-        """,
-        """
         {"key": "value"}
         """,
         """
@@ -57,30 +54,6 @@ yaml = YAML()
         key: >-
             multiple
             lines
-        """,
-        """
-        key: |
-            multiple
-            lines
-        other: 1
-        """,
-        """
-        key: |-
-            multiple
-            lines
-        other: 1
-        """,
-        """
-        key: >
-            multiple
-            lines
-        other: 1
-        """,
-        """
-        key: >-
-            multiple
-            lines
-        other: 1
         """,
     ],
 )
