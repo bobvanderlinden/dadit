@@ -29,7 +29,19 @@ def parse_json_pointer(pointer: str) -> JSONPointer:
     return JSONPointer.parse(pointer)
 
 
+value_parsers = {
+    "string": str,
+    "int": int,
+    "float": float,
+    "bool": bool,
+    "json": json_loads,
+}
+
+
 def parse_value(value: str) -> JSON:
+    for prefix, parser in value_parsers.items():
+        if value.startswith(prefix + ":"):
+            return parser(value[len(prefix) + 1 :])
     return json_loads(value)
 
 
@@ -77,11 +89,21 @@ def create_patch_action(arg_parser: Callable[[str], List[JSONPatchOperation]]):
 
 
 def subparser(subparsers):
-    parser = subparsers.add_parser("patch", help="Apply JSON patch to source")
+    parser = subparsers.add_parser(
+        "patch",
+        help="transform structured source using JSON patch operations.\nLoads JSON patch operations from a file using --patch-file or specify individual operations using --add, --remove, --replace, --move, --copy.\nJSON paths use / as separator and start with /.\nValues are JSON, unless a prefix is used (string:, int:, float:, bool:).",
+    )
     parser.set_defaults(subcommand=patch)
-    parser.add_argument("--format", choices=patchers.keys())
+    parser.add_argument(
+        "--format", choices=patchers.keys(), help="the format of the source file"
+    )
 
-    parser.add_argument("--patch-file", action=create_patch_action(parse_json_patch))
+    parser.add_argument(
+        "--patch-file",
+        metavar="patch_file",
+        help="path to JSON file to apply",
+        action=create_patch_action(parse_json_patch),
+    )
 
     def parse_replace_args(values) -> List[JSONPatchOperation]:
         pointer, value = tuple_parser([parse_json_pointer, parse_value])(values)
@@ -90,6 +112,8 @@ def subparser(subparsers):
     parser.add_argument(
         "--replace",
         nargs=2,
+        metavar=("path", "value"),
+        help="replace value at path with new value",
         action=create_patch_action(parse_replace_args),
     )
 
@@ -100,6 +124,8 @@ def subparser(subparsers):
     parser.add_argument(
         "--add",
         nargs=2,
+        metavar=("path", "value"),
+        help="add new value at path",
         action=create_patch_action(parse_add_args),
     )
 
@@ -111,6 +137,8 @@ def subparser(subparsers):
     parser.add_argument(
         "--remove",
         nargs=1,
+        metavar="path",
+        help="remove value at path",
         action=create_patch_action(parse_remove_args),
     )
 
@@ -121,6 +149,8 @@ def subparser(subparsers):
     parser.add_argument(
         "--move",
         nargs=2,
+        metavar=("from_path", "to_path"),
+        help="move value at from_path to to_path",
         action=create_patch_action(parse_move_args),
     )
 
@@ -131,12 +161,22 @@ def subparser(subparsers):
     parser.add_argument(
         "--copy",
         nargs=2,
+        metavar=("from_path", "to_path"),
+        help="copy value at from_path to to_path",
         action=create_patch_action(parse_copy_args),
     )
 
     parser.add_argument(
-        "source", type=argparse.FileType("r"), nargs="?", default=sys.stdin
+        "source",
+        type=argparse.FileType("r"),
+        nargs="?",
+        default=sys.stdin,
+        help="source file to transform. Defaults to stdin.",
     )
     parser.add_argument(
-        "destination", type=argparse.FileType("w"), nargs="?", default=sys.stdout
+        "destination",
+        type=argparse.FileType("w"),
+        nargs="?",
+        default=sys.stdout,
+        help="destination file to write to. Defaults to stdout.",
     )
