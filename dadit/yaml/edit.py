@@ -26,7 +26,7 @@ from ..json_patch import (
     JSONPatchCopy,
     JSONPatchTest,
 )
-from .serialization import loads as yaml_loads
+from .parse import parse_node
 
 default_indentation = "  "
 
@@ -37,21 +37,9 @@ def key_field(str) -> Selector:
             field("key"),
             type("flow_node"),
             children,
-            conditional(lambda node: parse_string(node) == str),
+            conditional(lambda node: parse_node(node) == str),
         )
     )
-
-
-def parse_string(node: Node) -> str:
-    match node:
-        case Node(type="double_quote_scalar", text=text):
-            return yaml_loads(text)  # type: ignore
-        case Node(type="single_quote_scalar", text=text):
-            return yaml_loads(text)  # type: ignore
-        case Node(type="plain_scalar", text=text):
-            return text.decode("utf-8")
-        case _:
-            raise ValueError(f"Unsupported node type {node.type}")
 
 
 def get_indentation(node: Node) -> str:
@@ -445,14 +433,14 @@ def get_value_by_path(root: JSON, path: list[str]) -> JSON:
 
 
 def edit_move(root: Node, from_: list[str], path: list[str]) -> Iterable[Edit]:
-    root_value = yaml_loads(root.text.decode("utf-8"))
+    root_value = parse_node(root)
     value = get_value_by_path(root_value, path)
     yield from edit_remove(root, path)
     yield from edit_add(root, path, value)
 
 
 def edit_copy(root: Node, from_: list[str], path: list[str]) -> Iterable[Edit]:
-    root_value = yaml_loads(root.text.decode("utf-8"))
+    root_value = parse_node(root)
     value = get_value_by_path(root_value, path)
     yield from edit_add(root, path, value)
 
