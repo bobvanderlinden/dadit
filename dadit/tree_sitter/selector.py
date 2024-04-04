@@ -18,6 +18,10 @@ def chain(*selectors: Selector) -> Selector:
     return chain_selector
 
 
+def identity(node: Node) -> Iterable[Node]:
+    yield node
+
+
 def children(node: Node) -> Iterable[Node]:
     for child in node.children:
         yield child
@@ -64,6 +68,14 @@ def field(str) -> Selector:
     return field_selector
 
 
+def capture(results: list[Node], selector: Selector) -> Selector:
+    def capture_selector(node: Node):
+        results.extend(selector(node))
+        yield node
+
+    return capture_selector
+
+
 def single(nodes: Iterable[Node]) -> Node:
     match [*nodes]:
         case [node]:
@@ -72,6 +84,38 @@ def single(nodes: Iterable[Node]) -> Node:
             raise ValueError("Expected a single node, got none")
         case _:
             raise ValueError("Expected a single node, got more than one")
+
+
+def optional(nodes: Iterable[Node]) -> Node:
+    match [*nodes]:
+        case [node]:
+            return node
+        case []:
+            return None
+        case _:
+            raise ValueError("Expected a single node, got more than one")
+
+
+def row(expected_row: int) -> Selector:
+    def row_condition(node: Node) -> bool:
+        node_row, node_column = node.end_point
+        return node_row == expected_row
+
+    return conditional(row_condition)
+
+
+def previous_node(node: Node) -> Iterable[Node]:
+    if node.prev_sibling:
+        yield node.prev_sibling
+    elif node.parent:
+        yield from previous_node(node.parent)
+
+
+def next_node(node: Node) -> Iterable[Node]:
+    if node.next_sibling:
+        yield node.next_sibling
+    elif node.parent:
+        yield from next_node(node.parent)
 
 
 def union(*selectors: Selector) -> Selector:

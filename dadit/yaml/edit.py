@@ -10,10 +10,12 @@ from ..tree_sitter.selector import (
     conditional,
     type,
     field,
-    single,
     union,
     parent,
     filter,
+    single,
+    optional,
+    previous_node,
 )
 from ..tree_sitter.document import Document
 from ..tree_sitter.edit import Edit, Replace, Insert, Remove, apply_edits
@@ -191,7 +193,7 @@ def get_node_by_name(node: Node, name: str) -> Node:
 
 def get_node_by_path(node: Node, path: list[str]) -> Node:
     if node.type == "stream":
-        node = single(query(node, children, type("document")))
+        node = node.named_child(0)
     match path:
         case []:
             return node
@@ -228,19 +230,51 @@ def expand_suffix_pattern(node: Node, selection: Selection, pattern: str) -> Sel
     return selection
 
 
+def row_of(node: Node) -> int:
+    return node.start_point[0]
+
+
 def edit_replace(root: Node, path: list[str], value: JSON) -> Iterable[Edit]:
     node = get_node_by_path(root, path)
     match node.type:
         case "block_mapping_pair":
-            key = single(query(node, field("key"))).text.decode("utf-8")
+            selection = select_node(node)
+            key = node.child_by_field_name("key").text.decode("utf-8")
             yaml_pair = indent_block(
                 stringify_block_mapping_pair(key, value),
                 indentation=get_block_indentation(node),
             )
+
+            comment = None
+
+            # Find comment from block_scalar.
+            if comment_node := optional(
+                query(
+                    node,
+                    children,
+                    type("block_scalar"),
+                    children,
+                    type("comment"),
+                )
+            ):
+                comment = comment_node.text.decode("utf-8")
+
+            # Find adjacent comment from same line.
+            if comment_node := node.next_sibling:
+                if comment_node.type == "comment" and row_of(comment_node) == row_of(
+                    node
+                ):
+                    comment = comment_node.text.decode("utf-8")
+                    # Replace this comment with the pair.
+                    selection = (selection[0], comment_node.end_byte)
+
+            if comment:
+                yaml_pair = re.sub(r"(\n|$)", f" {comment}\\1", yaml_pair, count=1)
+
             if node.text.endswith(b"\n"):
                 yaml_pair += "\n"
             yaml_pair = yaml_pair.encode("utf-8")
-            yield Replace(node.start_byte, node.end_byte, yaml_pair)
+            yield Replace(*selection, yaml_pair)
         case "flow_pair":
             yaml_value = stringify_flow(value).encode("utf-8")
             yield Replace(node.start_byte, node.end_byte, yaml_value)
@@ -254,6 +288,9 @@ def edit_replace(root: Node, path: list[str], value: JSON) -> Iterable[Edit]:
             selection = select_node(node)
             selection = expand_suffix_pattern(node, selection, r"^[ \t]+")
             yield Replace(selection[0], selection[1], yaml_value.encode("utf-8"))
+        case "document":
+            yaml_value = stringify_block(value) + "\n"
+            yield Replace(node.start_byte, node.end_byte, yaml_value.encode("utf-8"))
         case _:
             raise ValueError(f"Invalid node type {node.type}")
 
@@ -346,11 +383,18 @@ def edit_remove(root: Node, path: list[str]) -> Iterable[Edit]:
                 children,
                 type("block_mapping_pair"),
             ) == [node]:
-                selection = select_node(node)
+                yaml_fragment = b"{}"
+
+                selection = select_node(node.parent)
                 selection = expand_prefix_pattern(node, selection, r"[ \t]*\n?[ \t]*$")
                 selection = expand_suffix_pattern(node, selection, r"^[ \t]+")
 
-                yaml_fragment = b"{}"
+                # Make sure we place `{}` before any comment in the parent.
+                if comment_node := optional(
+                    query(node, previous_node, type("comment"))
+                ):
+                    yaml_fragment += b" " + comment_node.text
+                    selection = (comment_node.start_byte, selection[1])
 
                 # If the block_mapping resides inside an item/pair (ends with `-` or `:`), add a space.
                 if (
@@ -368,7 +412,7 @@ def edit_remove(root: Node, path: list[str]) -> Iterable[Edit]:
                     yaml_fragment = b" " + yaml_fragment
 
                 # If the previous block ended with a newline, let the new expression also end with a newline.
-                if node.text.endswith(b"\n"):
+                if node.parent.text.endswith(b"\n"):
                     yaml_fragment += b"\n"
 
                 yield Replace(*selection, yaml_fragment)
@@ -387,6 +431,13 @@ def edit_remove(root: Node, path: list[str]) -> Iterable[Edit]:
                 selection = expand_suffix_pattern(node, selection, r"^[ \t]*")
 
                 yaml_fragment = b"[]"
+
+                # Make sure we place `[]` before any comment in the parent.
+                if comment_node := optional(
+                    query(node, previous_node, type("comment"))
+                ):
+                    yaml_fragment += b" " + comment_node.text
+                    selection = (comment_node.start_byte, selection[1])
 
                 # If the block_sequence resides inside an item/pair (ends with `-` or `:`), add a space.
                 if (
