@@ -27,6 +27,7 @@ from ..json_patch import (
     JSONPatchMove,
     JSONPatchCopy,
     JSONPatchTest,
+    TestFailure,
 )
 from .parse import parse_node
 
@@ -496,6 +497,19 @@ def edit_copy(root: Node, from_: list[str], path: list[str]) -> Iterable[Edit]:
     yield from edit_add(root, path, value)
 
 
+def edit_test(root: Node, path: list[str], value: JSON) -> Iterable[Edit]:
+    try:
+        node = get_node_by_path(root, path)
+    except ValueError:
+        raise TestFailure(JSONPatchTest(path, value), path)
+    match node.type:
+        case "block_mapping_pair" | "flow_mapping_pair":
+            node = node.child_by_field_name("value")
+
+    if parse_node(node) != value:
+        raise TestFailure(JSONPatchTest(path, value), path)
+
+
 def edit_patch_operation(root: Node, operation: JSONPatchOperation) -> Iterable[Edit]:
     match operation:
         case JSONPatchAdd(path, value):
@@ -509,7 +523,7 @@ def edit_patch_operation(root: Node, operation: JSONPatchOperation) -> Iterable[
         case JSONPatchCopy(from_, path):
             yield from edit_copy(root, from_.parts, path.parts)
         case JSONPatchTest(path, value):
-            raise NotImplemented(f"Test not implemented")
+            yield from edit_test(root, path.parts, value)
         case _:
             raise ValueError(f"Unsupported JSON patch operation {operation}")
 

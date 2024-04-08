@@ -106,4 +106,12 @@ class JSONPatchTest(JSONPatchOperation):
     path: JSONPointer
     value: JSON
 
+
+class TestFailure(Exception):
+    def __init__(self, test: JSONPatchTest, path: JSONPointer):
+        super().__init__(f"Test failed")
+        self.test = test
+        self.path = path
+
+
 type JSONPatch = List[JSONPatchOperation]

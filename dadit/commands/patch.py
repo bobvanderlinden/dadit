@@ -13,6 +13,7 @@ from ..json_patch import (
     JSONPatchReplace,
     JSONPatchMove,
     JSONPatchCopy,
+    JSONPatchTest,
 )
 
 patchers = {
@@ -164,6 +165,18 @@ def subparser(subparsers):
         metavar=("from_path", "to_path"),
         help="copy value at from_path to to_path",
         action=create_patch_action(parse_copy_args),
+    )
+
+    def parse_test_args(values) -> List[JSONPatchOperation]:
+        pointer, value = tuple_parser([parse_json_pointer, parse_value])(values)
+        return [JSONPatchTest(pointer, value)]
+
+    parser.add_argument(
+        "--test",
+        nargs=2,
+        metavar=("path", "value"),
+        help="test value at path is equal to value",
+        action=create_patch_action(parse_test_args),
     )
 
     parser.add_argument(
