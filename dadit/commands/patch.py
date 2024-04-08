@@ -68,13 +68,13 @@ def patch(
     destination.write(destination_content)
 
 
-def create_patch_action(arg_parser: Callable[[str], List[JSONPatchOperation]]):
+def create_patch_action(arg_parser: Callable[[list[str]], List[JSONPatchOperation]]):
     class PatchAction(argparse.Action):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
 
         def __call__(self, parser, namespace, values, option_string=None):
-            if not isinstance(values, str):
+            if not isinstance(values, list):
                 raise ValueError(f"Unsupported argument type {type(values)}")
             setattr(
                 namespace,
