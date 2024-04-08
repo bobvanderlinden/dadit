@@ -63,6 +63,10 @@ def patch(
     patch_operations: JSONPatch,
     **kwargs,
 ):
+    if not format:
+        raise ValueError("Could not determine format. Use --format FORMAT to specify.")
+    if format not in patchers:
+        raise ValueError(f"Unsupported format {format}")
     apply_patch = patchers[format]
     source_content = source.read()
     destination_content = apply_patch(source_content, patch_operations)
